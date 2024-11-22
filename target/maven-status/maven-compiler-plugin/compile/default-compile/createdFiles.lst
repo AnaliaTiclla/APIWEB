@@ -1,2 +1,3 @@
 com\apimorena\ApiApplication.class
 com\apimorena\Producto.class
+com\apimorena\controller\HealthController.class
