@@ -15,6 +15,7 @@ import javax.annotation.PostConstruct;
 
 @SpringBootApplication
 @RestController
+@CrossOrigin(origins = "*")
 public class ApiApplication {
     @Value("${data.file.path}")
     private String jsonFilePath;
@@ -82,5 +83,15 @@ public class ApiApplication {
                 .filter(p -> p.getId() == id)
                 .findFirst()
                 .orElse(null);
+    }
+
+    @GetMapping("/")
+    public ResponseEntity<String> root() {
+        return ResponseEntity.ok("API running");
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("OK");
     }
 } 

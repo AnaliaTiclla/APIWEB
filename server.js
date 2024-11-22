@@ -8,34 +8,53 @@ const app = express();
 const port = process.env.NODE_PORT || 3000;
 const springBootPort = process.env.SPRING_PORT || 8080;
 
-const MAX_RETRIES = 5;
-const RETRY_DELAY = 2000;
+const MAX_RETRIES = 10;
+const RETRY_DELAY = 5000;
 
 app.use(express.json());
 
 function waitForSpringBoot(retries = 0) {
     return new Promise((resolve, reject) => {
-        const checkConnection = http.request({
-            hostname: 'localhost',
-            port: springBootPort,
-            path: '/actuator/health',
-            method: 'GET'
-        }, (res) => {
-            resolve(true);
-        });
+        console.log(`Intento ${retries + 1} de ${MAX_RETRIES} para conectar con Spring Boot...`);
+        
+        // Probar múltiples endpoints
+        const endpoints = ['/', '/health', '/productos'];
+        let successfulEndpoint = false;
 
-        checkConnection.on('error', (err) => {
-            if (retries < MAX_RETRIES) {
-                console.log(`Esperando a que Spring Boot inicie... (intento ${retries + 1})`);
+        Promise.all(endpoints.map(endpoint => {
+            return new Promise((endpointResolve) => {
+                const checkConnection = http.request({
+                    hostname: 'localhost',
+                    port: springBootPort,
+                    path: endpoint,
+                    method: 'GET',
+                    timeout: 5000
+                }, (res) => {
+                    console.log(`Spring Boot respondió en ${endpoint} con status: ${res.statusCode}`);
+                    if (res.statusCode === 200) {
+                        successfulEndpoint = true;
+                    }
+                    endpointResolve();
+                });
+
+                checkConnection.on('error', () => {
+                    console.log(`Error al intentar conectar con ${endpoint}`);
+                    endpointResolve();
+                });
+
+                checkConnection.end();
+            });
+        })).then(() => {
+            if (successfulEndpoint) {
+                resolve(true);
+            } else if (retries < MAX_RETRIES) {
                 setTimeout(() => {
                     waitForSpringBoot(retries + 1).then(resolve).catch(reject);
                 }, RETRY_DELAY);
             } else {
-                reject(new Error('No se pudo conectar a Spring Boot'));
+                reject(new Error('No se pudo conectar a Spring Boot después de múltiples intentos'));
             }
         });
-
-        checkConnection.end();
     });
 }
 
@@ -46,15 +65,27 @@ async function startSpringBoot() {
         // Verificar si el JAR existe antes de compilar
         if (!fs.existsSync('target/api-productos-1.0-SNAPSHOT.jar')) {
             console.log('Compilando proyecto con Maven...');
+            const mvnProcess = exec('mvn clean package', { 
+                cwd: process.cwd() 
+            });
+
+            // Capturar salida de Maven
+            mvnProcess.stdout.on('data', (data) => {
+                console.log(`Maven: ${data}`);
+            });
+
+            mvnProcess.stderr.on('data', (data) => {
+                console.error(`Maven Error: ${data}`);
+            });
+
             await new Promise((resolve, reject) => {
-                exec('mvn clean package -DskipTests', { cwd: process.cwd() }, (error, stdout, stderr) => {
-                    if (error) {
-                        console.error('Error al compilar con Maven:', error);
-                        reject(error);
-                        return;
+                mvnProcess.on('exit', (code) => {
+                    if (code === 0) {
+                        console.log('Compilación Maven exitosa');
+                        resolve();
+                    } else {
+                        reject(new Error(`Maven falló con código: ${code}`));
                     }
-                    console.log('Compilación Maven exitosa');
-                    resolve();
                 });
             });
         }
@@ -62,40 +93,32 @@ async function startSpringBoot() {
         // Iniciar Spring Boot con más logs
         console.log('Iniciando aplicación Spring Boot...');
         const springProcess = spawn('java', [
+            '-Ddebug=true',
+            '-Dlogging.level.root=DEBUG',
             '-jar',
-            'target/api-productos-1.0-SNAPSHOT.jar',
-            '--debug'  // Agregar modo debug
+            'target/api-productos-1.0-SNAPSHOT.jar'
         ], {
-            cwd: process.cwd(),
-            stdio: 'pipe'
+            cwd: process.cwd()
         });
 
+        // Capturar todos los logs de Spring Boot
         springProcess.stdout.on('data', (data) => {
-            console.log(`Spring Boot: ${data}`);
+            console.log(`Spring Boot: ${data.toString()}`);
         });
 
         springProcess.stderr.on('data', (data) => {
-            console.error(`Spring Boot Error: ${data}`);
+            console.error(`Spring Boot Error: ${data.toString()}`);
         });
 
-        springProcess.on('error', (error) => {
-            console.error('Error al iniciar Spring Boot:', error);
-        });
-
-        springProcess.on('exit', (code) => {
-            console.log(`Spring Boot proceso terminó con código: ${code}`);
-        });
-
-        // Aumentar el tiempo de espera y los reintentos
-        const RETRY_DELAY = 5000; // 5 segundos
-        const MAX_RETRIES = 10;   // 10 intentos
+        // Esperar a que Spring Boot inicie
+        await new Promise((resolve) => setTimeout(resolve, 15000));
 
         await waitForSpringBoot();
-        console.log('Spring Boot está listo');
+        console.log('Spring Boot está listo y respondiendo');
         
     } catch (error) {
         console.error('Error crítico al iniciar Spring Boot:', error);
-        process.exit(1);  // Terminar el proceso si hay un error crítico
+        process.exit(1);
     }
 }
 
