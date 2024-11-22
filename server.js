@@ -60,9 +60,19 @@ function waitForSpringBoot(retries = 0) {
 
 async function startSpringBoot() {
     try {
-        // Verificar Java
-        const javaPath = process.platform === 'win32' ? 'java.exe' : 'java';
-        
+        // Encontrar la ruta de Java
+        const javaHome = process.env.JAVA_HOME;
+        const javaPath = javaHome 
+            ? path.join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
+            : process.platform === 'win32' ? 'java.exe' : '/usr/bin/java';
+
+        console.log(`Usando Java en: ${javaPath}`);
+
+        // Verificar que Java existe
+        if (!fs.existsSync(javaPath)) {
+            throw new Error(`No se encontró Java en: ${javaPath}`);
+        }
+
         console.log('Verificando Maven y el archivo JAR...');
         const jarPath = 'target/api-productos-1.0-SNAPSHOT.jar';
         
