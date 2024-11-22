@@ -4,7 +4,7 @@ const path = require('path');
 const http = require('http');
 
 const app = express();
-const port = 3000;
+const port = 8080;
 const springBootPort = 8080;
 
 const MAX_RETRIES = 5;
