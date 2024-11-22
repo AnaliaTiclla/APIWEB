@@ -60,26 +60,25 @@ function waitForSpringBoot(retries = 0) {
 
 async function startSpringBoot() {
     try {
-        console.log('Verificando Maven...');
+        // Verificar Java
+        const javaPath = process.platform === 'win32' ? 'java.exe' : 'java';
         
-        // Verificar si el JAR existe antes de compilar
-        if (!fs.existsSync('target/api-productos-1.0-SNAPSHOT.jar')) {
-            console.log('Compilando proyecto con Maven...');
-            const mvnProcess = exec('mvn clean package', { 
-                cwd: process.cwd() 
-            });
-
-            // Capturar salida de Maven
-            mvnProcess.stdout.on('data', (data) => {
-                console.log(`Maven: ${data}`);
-            });
-
-            mvnProcess.stderr.on('data', (data) => {
-                console.error(`Maven Error: ${data}`);
-            });
-
+        console.log('Verificando Maven y el archivo JAR...');
+        const jarPath = 'target/api-productos-1.0-SNAPSHOT.jar';
+        
+        // Verificar si el JAR existe
+        if (!fs.existsSync(jarPath)) {
+            console.log('El archivo JAR no existe, compilando con Maven...');
             await new Promise((resolve, reject) => {
-                mvnProcess.on('exit', (code) => {
+                const mvn = exec('mvn clean package', { 
+                    cwd: process.cwd(),
+                    stdio: 'inherit'
+                });
+
+                mvn.stdout?.pipe(process.stdout);
+                mvn.stderr?.pipe(process.stderr);
+
+                mvn.on('exit', (code) => {
                     if (code === 0) {
                         console.log('Compilación Maven exitosa');
                         resolve();
@@ -90,18 +89,21 @@ async function startSpringBoot() {
             });
         }
 
-        // Iniciar Spring Boot con más logs
-        console.log('Iniciando aplicación Spring Boot...');
-        const springProcess = spawn('java', [
-            '-Ddebug=true',
-            '-Dlogging.level.root=DEBUG',
+        // Verificar que el JAR existe después de compilar
+        if (!fs.existsSync(jarPath)) {
+            throw new Error(`No se encontró el archivo JAR en: ${jarPath}`);
+        }
+
+        console.log('Iniciando Spring Boot...');
+        const springProcess = spawn(javaPath, [
             '-jar',
-            'target/api-productos-1.0-SNAPSHOT.jar'
+            jarPath
         ], {
-            cwd: process.cwd()
+            cwd: process.cwd(),
+            stdio: 'pipe'
         });
 
-        // Capturar todos los logs de Spring Boot
+        // Capturar salida
         springProcess.stdout.on('data', (data) => {
             console.log(`Spring Boot: ${data.toString()}`);
         });
