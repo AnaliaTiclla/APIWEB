@@ -1,13 +1,11 @@
 package com.apimorena;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -15,52 +13,30 @@ import java.util.List;
 
 @SpringBootApplication
 @RestController
-@CrossOrigin(origins = "*")
 public class ApiApplication {
-    @Value("${data.file.path}")
-    private String jsonFilePath;
-    
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String JSON_FILE = "productos.json";
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args) {
         SpringApplication.run(ApiApplication.class, args);
     }
 
-    @PostConstruct
-    public void init() {
-        try {
-            File file = new File(jsonFilePath);
-            File parentDir = file.getParentFile();
-            
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
-            }
-            
-            if (!file.exists()) {
-                file.createNewFile();
-                objectMapper.writeValue(file, new ArrayList<>());
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Error inicializando archivo JSON: " + e.getMessage());
-        }
-    }
-
     private List<Producto> cargarProductos() {
         try {
-            File file = new File(jsonFilePath);
+            File file = new File(JSON_FILE);
             if (file.exists()) {
                 return objectMapper.readValue(file, 
                     objectMapper.getTypeFactory().constructCollectionType(List.class, Producto.class));
             }
         } catch (IOException e) {
-            throw new RuntimeException("Error al cargar productos", e);
+            e.printStackTrace();
         }
         return new ArrayList<>();
     }
 
     private void guardarProductos(List<Producto> productos) {
         try {
-            objectMapper.writeValue(new File(jsonFilePath), productos);
+            objectMapper.writeValue(new File(JSON_FILE), productos);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -89,15 +65,5 @@ public class ApiApplication {
                 .filter(p -> p.getId() == id)
                 .findFirst()
                 .orElse(null);
-    }
-
-    @GetMapping("/")
-    public ResponseEntity<String> root() {
-        return ResponseEntity.ok("API running");
-    }
-
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("OK");
     }
 } 
