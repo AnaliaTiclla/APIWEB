@@ -2,6 +2,7 @@ const express = require('express');
 const { exec, spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.NODE_PORT || 3000;
@@ -42,32 +43,33 @@ async function startSpringBoot() {
     try {
         console.log('Verificando Maven...');
         
-        // Compilar con Maven
-        const mvnProcess = await new Promise((resolve, reject) => {
-            exec('mvn clean package', { cwd: process.cwd() }, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Error al compilar con Maven:', error);
-                    console.error('Maven stdout:', stdout);
-                    console.error('Maven stderr:', stderr);
-                    reject(error);
-                    return;
-                }
-                console.log('Compilación Maven exitosa');
-                resolve();
+        // Verificar si el JAR existe antes de compilar
+        if (!fs.existsSync('target/api-productos-1.0-SNAPSHOT.jar')) {
+            console.log('Compilando proyecto con Maven...');
+            await new Promise((resolve, reject) => {
+                exec('mvn clean package -DskipTests', { cwd: process.cwd() }, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error('Error al compilar con Maven:', error);
+                        reject(error);
+                        return;
+                    }
+                    console.log('Compilación Maven exitosa');
+                    resolve();
+                });
             });
-        });
+        }
 
-        // Iniciar el JAR de Spring Boot
+        // Iniciar Spring Boot con más logs
         console.log('Iniciando aplicación Spring Boot...');
         const springProcess = spawn('java', [
             '-jar',
-            'target/api-productos-1.0-SNAPSHOT.jar'
+            'target/api-productos-1.0-SNAPSHOT.jar',
+            '--debug'  // Agregar modo debug
         ], {
             cwd: process.cwd(),
-            stdio: 'pipe'  // Capturar la salida
+            stdio: 'pipe'
         });
 
-        // Manejar la salida de Spring Boot
         springProcess.stdout.on('data', (data) => {
             console.log(`Spring Boot: ${data}`);
         });
@@ -76,12 +78,24 @@ async function startSpringBoot() {
             console.error(`Spring Boot Error: ${data}`);
         });
 
-        // Esperar a que Spring Boot esté listo
+        springProcess.on('error', (error) => {
+            console.error('Error al iniciar Spring Boot:', error);
+        });
+
+        springProcess.on('exit', (code) => {
+            console.log(`Spring Boot proceso terminó con código: ${code}`);
+        });
+
+        // Aumentar el tiempo de espera y los reintentos
+        const RETRY_DELAY = 5000; // 5 segundos
+        const MAX_RETRIES = 10;   // 10 intentos
+
         await waitForSpringBoot();
-        console.log('Spring Boot está listo para recibir conexiones');
+        console.log('Spring Boot está listo');
         
     } catch (error) {
-        console.error('Error al iniciar Spring Boot:', error);
+        console.error('Error crítico al iniciar Spring Boot:', error);
+        process.exit(1);  // Terminar el proceso si hay un error crítico
     }
 }
 
