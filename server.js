@@ -5,7 +5,7 @@ const http = require('http');
 
 const app = express();
 const port = 3000;
-const springBootPort = 8080;
+const springBootPort = process.env.PORT || 8080;
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 2000;
@@ -15,9 +15,9 @@ app.use(express.json());
 function waitForSpringBoot(retries = 0) {
     return new Promise((resolve, reject) => {
         const checkConnection = http.request({
-            hostname: 'localhost',
+            hostname: '0.0.0.0',
             port: springBootPort,
-            path: '/actuator/health',
+            path: '/productos',
             method: 'GET'
         }, (res) => {
             resolve(true);

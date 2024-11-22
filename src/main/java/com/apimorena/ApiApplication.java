@@ -14,24 +14,30 @@ import java.util.List;
 @SpringBootApplication
 @RestController
 public class ApiApplication {
-    private static final String JSON_FILE = "productos.json";
+    private static final String JSON_FILE = System.getProperty("user.dir") + "/productos.json";
     private ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args) {
+        String port = System.getenv("PORT");
+        if (port != null) {
+            System.setProperty("server.port", port);
+        }
         SpringApplication.run(ApiApplication.class, args);
     }
 
     private List<Producto> cargarProductos() {
         try {
             File file = new File(JSON_FILE);
-            if (file.exists()) {
-                return objectMapper.readValue(file, 
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, Producto.class));
+            if (!file.exists()) {
+                file.createNewFile();
+                guardarProductos(new ArrayList<>());
             }
+            return objectMapper.readValue(file, 
+                objectMapper.getTypeFactory().constructCollectionType(List.class, Producto.class));
         } catch (IOException e) {
             e.printStackTrace();
+            return new ArrayList<>();
         }
-        return new ArrayList<>();
     }
 
     private void guardarProductos(List<Producto> productos) {
