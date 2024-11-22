@@ -7,11 +7,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.PostConstruct;
 
 @SpringBootApplication
 @RestController
@@ -28,14 +28,20 @@ public class ApiApplication {
 
     @PostConstruct
     public void init() {
-        File file = new File(jsonFilePath);
-        if (!file.exists()) {
-            try {
+        try {
+            File file = new File(jsonFilePath);
+            File parentDir = file.getParentFile();
+            
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+            
+            if (!file.exists()) {
                 file.createNewFile();
                 objectMapper.writeValue(file, new ArrayList<>());
-            } catch (IOException e) {
-                throw new RuntimeException("Error creando archivo JSON", e);
             }
+        } catch (IOException e) {
+            throw new RuntimeException("Error inicializando archivo JSON: " + e.getMessage());
         }
     }
 
