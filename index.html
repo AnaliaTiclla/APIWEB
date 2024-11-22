@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ejecutar Java</title>
+</head>
+<body>
+    <h1>Ejecutar programa Java</h1>
+    <button onclick="ejecutarJava()">Ejecutar</button>
+    <div id="resultado"></div>
+
+    <script>
+        function ejecutarJava() {
+            fetch('/ejecutar-java')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('resultado').textContent = data;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+    </script>
+</body>
+</html> 
